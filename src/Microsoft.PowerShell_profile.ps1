@@ -6,13 +6,6 @@ $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltinRole]::Administ
 
 #endregion
 
-# $host.PrivateData.ErrorForegroundColor = 'green'
-
-# Workaround for 1809 breaking opacity
-# Set-ItemProperty -Path HKCU:\Console -Name WindowAlpha -Value 204
-
-# Set-Location "$env:SystemDrive\"
-
 #region PSReadLine Config
 
 Set-PSReadlineKeyHandler -Key UpArrow -Function HistorySearchBackward
@@ -21,70 +14,56 @@ Set-PSReadlineKeyHandler -Key DownArrow -Function HistorySearchForward
 # Set-PSReadLineOption -PredictionSource History
 Set-PSReadLineOption -PredictionSource HistoryAndPlugin -PredictionViewStyle ListView
 
-#endregion
-
 # Fix for Windows Terminal Ctrl + Backspace removing only single character
-if ($null -ne $env:WT_SESSION) {
-    Set-PSReadLineKeyHandler -key Ctrl+h -Function BackwardKillWord
-}
+if ($null -ne $env:WT_SESSION) { Set-PSReadLineKeyHandler -key Ctrl+h -Function BackwardKillWord }
 
-#$ErrorView = 'CategoryView'
+#endregion
 
 #region Git Console Settings
 
-if (Import-Module -Name posh-git, posh-sshell, Terminal-Icons -PassThru -ErrorAction SilentlyContinue) {
-    function global:PromptWriteErrorInfo() {
-        if ($global:GitPromptValues.DollarQuestion) { return }
+if (!(Import-Module -Name Terminal-Icons -PassThru -ErrorAction SilentlyContinue)) {
+    Write-Warning 'Terminal-Icons is not installed'
+}
 
-        if ($global:GitPromptValues.LastExitCode) {
-            "`e[31m(" + $global:GitPromptValues.LastExitCode + ") `e[0m"
-        }
-        else {
-            "`e[31m! `e[0m"
+if (Import-Module -Name posh-git -PassThru -ErrorAction SilentlyContinue) {
+    function PromptWriteErrorInfo() {
+        if ($global:GitPromptValues.DollarQuestion) { return Write-Prompt " " }
+
+        return Write-Prompt `
+            ($global:GitPromptValues.LastExitCode ? " $($global:GitPromptValues.LastExitCode) " : " ! ") `
+            -ForegroundColor $host.PrivateData.ErrorForegroundColor
+    }
+
+    function PromptWriteHistoryInfo([Microsoft.PowerShell.Commands.HistoryInfo]$PrevCommand) {
+        $time = New-TimeSpan -Start $PrevCommand.StartExecutionTime -End $PrevCommand.EndExecutionTime
+
+        switch ($time) {
+            {$_.TotalMinutes -ge 1} {
+                return Write-Prompt ('{0,5:f1}m' -f $_.TotalMinutes) -ForegroundColor $host.PrivateData.ErrorForegroundColor
+            }
+            {$_.TotalMinutes -lt 1 -and $_.TotalSeconds -ge 1} {
+                return Write-Prompt ('{0,5:f1}s' -f $_.TotalSeconds) -ForegroundColor $host.PrivateData.WarningForegroundColor
+            }
+            default {
+                return Write-Prompt ('{0,4:f1}ms' -f $_.TotalMilliseconds) -ForegroundColor $host.PrivateData.FormatAccentColor
+            }
         }
     }
 
     function prompt {
-        $origDollarQuestion = $global:?
-        $origLastExitCode = $global:LASTEXITCODE
+        if (!$global:GitPromptValues) { $global:GitPromptValues = [PoshGitPromptValues]::new() }
 
-        if (!$global:GitPromptValues) {
-            $global:GitPromptValues = [PoshGitPromptValues]::new()
-        }
-
-        $global:GitPromptValues.DollarQuestion = $origDollarQuestion
-        $global:GitPromptValues.LastExitCode = $origLastExitCode
+        $global:GitPromptValues.DollarQuestion = $global:?
+        $global:GitPromptValues.LastExitCode = $global:LASTEXITCODE
         $global:GitPromptValues.IsAdmin = $isAdmin
 
         $prompt = Write-Prompt "[$((Get-Date).ToString('t'))]"
 
-        try {
+        $prevCommand = Get-History -Count 1 -ErrorAction Ignore
 
-            $prevCommand = Get-History -Count 1 -ErrorAction Ignore
+        if ($prevCommand) { $prompt += Write-Prompt "[$(PromptWriteHistoryInfo($prevCommand))]" }
 
-            if ($prevCommand) {
-                $prevCommandTime = New-TimeSpan -Start $prevCommand.StartExecutionTime -End $prevCommand.EndExecutionTime
-                $prompt += Write-Prompt "["
-                switch ($prevCommandTime) {
-                    {$_.TotalMinutes -ge 1} {
-                        $prompt += Write-Prompt ('{0,5:f1}m' -f $_.TotalMinutes) -ForegroundColor Red
-                    }
-                    {$_.TotalMinutes -lt 1 -and $_.TotalSeconds -ge 1} {
-                        $prompt += Write-Prompt ('{0,5:f1}s' -f $_.TotalSeconds) -ForegroundColor Yellow
-                    }
-                    default {
-                        $prompt += Write-Prompt ('{0,4:f1}ms' -f $_.Milliseconds) -ForegroundColor Green
-                    }
-                }
-                $prompt += Write-Prompt "] "
-            } else {
-                $prompt += Write-Prompt ' '
-            }
-        } catch {
-            $prompt += Write-Prompt "[History Error] "
-        }
-
-        $prompt += global:PromptWriteErrorInfo
+        $prompt += (PromptWriteErrorInfo)
 
         try {
             if ("$($pwd.Drive):\" -eq "$($pwd.Path)") {
@@ -103,34 +82,29 @@ if (Import-Module -Name posh-git, posh-sshell, Terminal-Icons -PassThru -ErrorAc
 
         $prompt += Write-VcsStatus
 
-        if ($isAdmin) {
-            $host.UI.RawUI.WindowTitle = "[Admin] [$rootPath] [$((Get-Date).ToString('D'))]"
-        } else {
-            $host.UI.RawUI.WindowTitle = "[$rootPath] [$((Get-Date).ToString('D'))]"
-        }
+        if ($PSDebugContext) { $prompt += Write-Prompt " [DBG]" -ForegroundColor Magenta }
 
-        $prompt += Write-Prompt "$(if ($PSDebugContext) { ' [DBG]:' } else { '' })" -ForegroundColor Magenta
         $prompt += Write-Prompt '> '
 
-        #$global:GitPromptValues.LastPrompt = EscapeAnsiString $prompt
-
-        $global:LASTEXITCODE = $origLastExitCode
+        $host.UI.RawUI.WindowTitle = $isAdmin ?
+            "[Admin] [$rootPath] [$((Get-Date).ToString('D'))]" :
+            "[$rootPath] [$((Get-Date).ToString('D'))]"
 
         $prompt
     }
 } else {
-    Write-Warning 'Posh-Git, Posh-SSHell or Terminal-Icons is not installed'
-}
-
-if (! (Import-Module -Name DockerCompletion -PassThru -ErrorAction SilentlyContinue)) {
-    Write-Warning 'DockerCompletion is not installed'
+    Write-Warning 'Posh-Git is not installed'
 }
 
 #endregion
 
+#region Terminal Shortcuts
+
 function New-Tab { wt -w 0 nt -d . }
 
 function New-SplitTab { wt -w 0 sp -H -d . }
+
+#endregion
 
 #region Recommended Module
 
@@ -168,7 +142,7 @@ function Get-RecommendedModules {
 
 #endregion
 
-#region Labor
+#region CSS GA Labor
 
 function Get-GenAdmin() {
     [cmdletbinding()]
