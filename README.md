@@ -28,10 +28,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 
 - `-Profile` only (skip Copilot statusline)
 - `-Copilot` only (skip profile)
-- `-SkipModules` (do not install posh-git, Terminal-Icons, etc.)
+- `-InstallModules` (also install posh-git, Terminal-Icons, etc. - **off by default**)
 - `-Force` (overwrite existing profile / statusline files without prompting)
 
-By default it does everything: installs recommended modules in `CurrentUser` scope, copies the profile to `$PROFILE.CurrentUserCurrentHost`, and sets up the Copilot CLI statusline.
+By default it copies the profile to `$PROFILE.CurrentUserCurrentHost` and sets up the Copilot CLI statusline. Pass `-InstallModules` to also install the recommended PowerShell modules in `CurrentUser` scope.
 
 After install: open a new pwsh window, and run `/restart` inside Copilot CLI if it's already open.
 

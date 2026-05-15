@@ -6,7 +6,9 @@
 # Switches:
 #   -ProfileOnly      Only install the profile (skip Copilot statusline + settings).
 #   -CopilotOnly      Only install the Copilot statusline (skip profile + modules).
-#   -SkipModules      Do not install/upgrade recommended PowerShell modules.
+#   -InstallModules   Also install the recommended PowerShell modules
+#                     (posh-git, Terminal-Icons, PSScriptAnalyzer, DockerCompletion,
+#                     posh-sshell, dbatools). Off by default.
 #   -Force            Overwrite existing profile / statusline files without prompting.
 #   -InstallScope     'CurrentUser' (default) or 'AllUsers' for module installation.
 #
@@ -16,7 +18,7 @@
 param(
     [switch]$ProfileOnly,
     [switch]$CopilotOnly,
-    [switch]$SkipModules,
+    [switch]$InstallModules,
     [switch]$Force,
     [ValidateSet('CurrentUser', 'AllUsers')]
     [string]$InstallScope = 'CurrentUser'
@@ -197,7 +199,7 @@ Write-Host "Scope:   $InstallScope"
 Write-Host ''
 
 if (-not $CopilotOnly) {
-    if (-not $SkipModules) { Install-RecommendedModules }
+    if ($InstallModules) { Install-RecommendedModules }
     Install-Profile
 }
 
