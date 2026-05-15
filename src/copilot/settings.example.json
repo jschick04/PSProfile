@@ -1,0 +1,14 @@
+{
+  "_comment": "Example fragment showing what install.ps1 merges into %USERPROFILE%\\.copilot\\settings.json. Do NOT copy this _comment field.",
+  "statusLine": {
+    "type": "command",
+    "command": "%USERPROFILE%\\.copilot\\statusline.cmd",
+    "padding": 1
+  },
+  "feature_flags": {
+    "enabled": [
+      "STATUS_LINE"
+    ]
+  },
+  "experimental": true
+}
