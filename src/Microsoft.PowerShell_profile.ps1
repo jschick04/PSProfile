@@ -156,6 +156,19 @@ function Get-RecommendedModules {
 
 #endregion
 
+#region Copilot CLI
+
+function autopilot {
+    param([switch]$Full)
+    if ($Full) {
+        copilot --allow-all @args
+    } else {
+        copilot --allow-all-paths --allow-all-urls --allow-tool write @args
+    }
+}
+
+#endregion
+
 #region Auto Completion
 
 # PowerShell parameter completion shim for the dotnet CLI
