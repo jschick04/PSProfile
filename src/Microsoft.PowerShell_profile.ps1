@@ -159,11 +159,23 @@ function Get-RecommendedModules {
 #region Copilot CLI
 
 function autopilot {
-    param([switch]$Full)
+    param(
+        [switch]$Full,
+        [switch]$Compact
+    )
+
+    $resume = @()
+    if ($Compact) {
+        # Path-agnostic: the agent re-discovers its own nested-AGENTS.md / custom-instruction
+        # files from the system-prompt block, so this works on any machine and any repo.
+        $compactPrompt = '/compact On resume, the FIRST tool call MUST be to re-read every AGENTS.md / custom-instruction file listed in this session''s nested-instructions block (especially §0 Git Safety Gates incl. PRE-GIT SENTINEL, §1 phase router, and pre-commit.md disciplines). Preserve in the summary: no `git add .` / -A / --all, no Co-authored-by trailer, single-line commit messages, and that the PR-quality-gate ack block does NOT satisfy §0 user-approval gates.'
+        $resume = @('--continue', '-i', $compactPrompt)
+    }
+
     if ($Full) {
-        copilot --allow-all @args
+        copilot --allow-all @resume @args
     } else {
-        copilot --allow-all-paths --allow-all-urls --allow-tool write @args
+        copilot --allow-all-paths --allow-all-urls --allow-tool write @resume @args
     }
 }
 
