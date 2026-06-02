@@ -159,23 +159,46 @@ function Get-RecommendedModules {
 #region Copilot CLI
 
 function autopilot {
+    [CmdletBinding(DefaultParameterSetName = 'Default')]
     param(
+        [Parameter(ParameterSetName = 'Full')]
         [switch]$Full,
-        [switch]$Compact
+
+        [Parameter(ParameterSetName = 'Compact', Mandatory = $true)]
+        [switch]$Compact,
+
+        # Optional session ID / name / 7+ char ID prefix to resume; defaults to most recent.
+        [Parameter(ParameterSetName = 'Compact', Position = 0)]
+        [ValidateScript({
+            if ($_ -match '^-') {
+                throw "SessionId '$_' looks like a flag. Use -SessionId <value> to disambiguate, e.g. ``autopilot -Compact -SessionId <id> --model gpt-5.2``."
+            }
+            $true
+        })]
+        [string]$SessionId,
+
+        # Captures any extra args (e.g. --model, --plan) and forwards them to copilot.
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Remaining
     )
 
-    $resume = @()
     if ($Compact) {
         # Path-agnostic: the agent re-discovers its own nested-AGENTS.md / custom-instruction
         # files from the system-prompt block, so this works on any machine and any repo.
         $compactPrompt = '/compact On resume, the FIRST tool call MUST be to re-read every AGENTS.md / custom-instruction file listed in this session''s nested-instructions block (especially §0 Git Safety Gates incl. PRE-GIT SENTINEL, §1 phase router, and pre-commit.md disciplines). Preserve in the summary: no `git add .` / -A / --all, no Co-authored-by trailer, single-line commit messages, and that the PR-quality-gate ack block does NOT satisfy §0 user-approval gates.'
-        $resume = @('--continue', '-i', $compactPrompt)
+
+        $resume = if ($SessionId) { @('--resume', $SessionId) } else { @('--continue') }
+
+        # No --allow-* flags on resume — the session inherits its original permission state,
+        # so re-specifying -Full is unnecessary (and -Full / -Compact are now mutually exclusive).
+        copilot @resume -i $compactPrompt @Remaining
+        return
     }
 
     if ($Full) {
-        copilot --allow-all @resume @args
+        copilot --allow-all @Remaining
     } else {
-        copilot --allow-all-paths --allow-all-urls --allow-tool write @resume @args
+        copilot --allow-all-paths --allow-all-urls --allow-tool write @Remaining
     }
 }
 
