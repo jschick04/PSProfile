@@ -192,7 +192,7 @@ function autopilot {
     if ($Compact) {
         # Path-agnostic: the agent re-discovers its own nested-AGENTS.md / custom-instruction
         # files from the system-prompt block, so this works on any machine and any repo.
-        $compactPrompt = '/compact On resume, the FIRST tool call MUST be to re-read every AGENTS.md / custom-instruction file listed in this session''s nested-instructions block (especially §0 Git Safety Gates incl. PRE-GIT SENTINEL, §1 phase router, and pre-commit.md disciplines). Preserve in the summary: no `git add .` / -A / --all, no Co-authored-by trailer, single-line commit messages, and that the PR-quality-gate ack block does NOT satisfy §0 user-approval gates.'
+        $compactPrompt = '/compact On resume, the FIRST tool call MUST be to re-read every AGENTS.md / custom-instruction file listed in this session''s nested-instructions block (especially §0 Git Safety Gates incl. PRE-GIT SENTINEL, §1 phase router incl. the comment-protocol sub-step auto-fire, §3.1 Comments three-step gate, and pre-commit.md disciplines). Preserve in the summary: no `git add .` / -A / --all, no Co-authored-by trailer, single-line commit messages, that the PR-quality-gate ack block does NOT satisfy §0 user-approval gates, and that NO new code comment (any syntax, any language) is added without working through §3.1 clarity-check → rename-check → ask_user comment-approval gate IN THAT ORDER — the ask_user call precedes the edit. If ask_user is unavailable (headless), DROP the comment — NEVER block the change. Sub-agents may NEVER introduce comments via edit calls (propose-only; orchestrator runs the gate on integration).'
 
         [string[]] $resume = if ($SessionId) { @('--resume', $SessionId) } else { @('--continue') }
 
