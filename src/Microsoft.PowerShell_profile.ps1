@@ -162,19 +162,18 @@ function autopilot {
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     param(
         [Parameter(ParameterSetName = 'Full')]
+        [Parameter(ParameterSetName = 'FullCompact', Mandatory = $true)]
         [switch]$Full,
 
         [Parameter(ParameterSetName = 'Compact', Mandatory = $true)]
+        [Parameter(ParameterSetName = 'FullCompact', Mandatory = $true)]
         [switch]$Compact,
 
         # Optional session ID / name / 7+ char ID prefix to resume; defaults to most recent.
-        [Parameter(ParameterSetName = 'Compact', Position = 0)]
-        [ValidateScript({
-            if ($_ -match '^-') {
-                throw "SessionId '$_' looks like a flag. Use -SessionId <value> to disambiguate, e.g. ``autopilot -Compact -SessionId <id> --model gpt-5.2``."
-            }
-            $true
-        })]
+        # Named-only (no positional) to avoid binding-time collision with passthrough args
+        # like --model that PowerShell would otherwise try to bind to Position 0.
+        [Parameter(ParameterSetName = 'Compact')]
+        [Parameter(ParameterSetName = 'FullCompact')]
         [string]$SessionId,
 
         # Captures any extra args (e.g. --model, --plan) and forwards them to copilot.
@@ -182,24 +181,29 @@ function autopilot {
         [string[]]$Remaining
     )
 
+    # [string[]] cast prevents PowerShell from auto-unwrapping a single-element array to a
+    # scalar string (which would then splat character-by-character on call).
+    [string[]] $permFlags = if ($Full) {
+        @('--allow-all')
+    } else {
+        @('--allow-all-paths', '--allow-all-urls', '--allow-tool', 'write')
+    }
+
     if ($Compact) {
         # Path-agnostic: the agent re-discovers its own nested-AGENTS.md / custom-instruction
         # files from the system-prompt block, so this works on any machine and any repo.
         $compactPrompt = '/compact On resume, the FIRST tool call MUST be to re-read every AGENTS.md / custom-instruction file listed in this session''s nested-instructions block (especially §0 Git Safety Gates incl. PRE-GIT SENTINEL, §1 phase router, and pre-commit.md disciplines). Preserve in the summary: no `git add .` / -A / --all, no Co-authored-by trailer, single-line commit messages, and that the PR-quality-gate ack block does NOT satisfy §0 user-approval gates.'
 
-        $resume = if ($SessionId) { @('--resume', $SessionId) } else { @('--continue') }
+        [string[]] $resume = if ($SessionId) { @('--resume', $SessionId) } else { @('--continue') }
 
-        # No --allow-* flags on resume — the session inherits its original permission state,
-        # so re-specifying -Full is unnecessary (and -Full / -Compact are now mutually exclusive).
-        copilot @resume -i $compactPrompt @Remaining
+        # Permission flags ARE re-applied on resume: copilot --continue / --resume do NOT
+        # inherit the prior session's --allow-* state, so -Full must be re-specified
+        # alongside -Compact to keep elevated permissions on the resumed session.
+        copilot @resume @permFlags -i $compactPrompt @Remaining
         return
     }
 
-    if ($Full) {
-        copilot --allow-all @Remaining
-    } else {
-        copilot --allow-all-paths --allow-all-urls --allow-tool write @Remaining
-    }
+    copilot @permFlags @Remaining
 }
 
 #endregion
